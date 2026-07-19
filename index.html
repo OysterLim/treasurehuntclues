@@ -361,23 +361,38 @@ function slugify(name){
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'team';
 }
 
-async function getConfig(){
+let configCache = null;
+let configCacheAt = 0;
+const CONFIG_CACHE_MS = 20000;
+
+async function getConfig(forceFresh){
   const fallback = { title: 'The Case File', intro: 'A trail of coded evidence awaits. Enter the first code to begin.', pin: '1234', clues: [] };
   if(!db) return fallback;
+  if(!forceFresh && configCache && (Date.now() - configCacheAt) < CONFIG_CACHE_MS){
+    return configCache;
+  }
   try{
-    const snap = await getDoc(doc(db,'config','main'));
+    const [snap, cluesSnap] = await Promise.all([
+      getDoc(doc(db,'config','main')),
+      getDocs(query(collection(db,'clues'), orderBy('order')))
+    ]);
     const base = snap.exists() ? snap.data() : {};
-    const cluesSnap = await getDocs(query(collection(db,'clues'), orderBy('order')));
     const clues = cluesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    return {
+    const result = {
       title: base.title || fallback.title,
       intro: base.intro || fallback.intro,
       pin: base.pin || fallback.pin,
       clues
     };
+    configCache = result;
+    configCacheAt = Date.now();
+    return result;
   }catch(e){
-    return fallback;
+    return configCache || fallback;
   }
+}
+function invalidateConfigCache(){
+  configCache = null;
 }
 async function saveConfig(cfg, previousClueIds){
   const rows = cfg.clues || [];
@@ -880,6 +895,7 @@ function bindAdminActions(cfg, teams){
     const previousClueIds = (cfg.clues || []).map(c => c.id).filter(Boolean);
     try{
       await saveConfig(newCfg, previousClueIds);
+      invalidateConfigCache();
       await renderAdmin();
       const msgEl = document.getElementById('save-msg');
       if(msgEl) msgEl.textContent = 'Saved.';
