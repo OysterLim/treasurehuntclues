@@ -71,3 +71,34 @@ first" screen until the config is filled in correctly.
 ## Running it locally
 You can also just open `index.html` directly in a browser — no build step or
 local server required, as long as your Firebase config is filled in.
+
+## Live team map (admin)
+The admin panel now shows a live map (via Leaflet + OpenStreetMap — free,
+no API key needed) plotting each team's last known location. This requires:
+- The site running over HTTPS (GitHub Pages provides this automatically)
+- Each team's browser to grant location permission when prompted
+- Location only updates while a team's play screen is actually open on their
+  device — closing or backgrounding the browser stops tracking (this is a
+  browser/PWA limitation, not something a native app-only feature would need)
+
+Team locations update on their end roughly every 45 seconds while playing,
+and the admin map refreshes whenever you tap the leaderboard's **Refresh**
+button (kept manual to stay well within Firebase's free tier for larger
+events).
+
+## Installing it as an app (PWA)
+Once hosted on GitHub Pages (or anywhere over HTTPS), the site can be
+installed like a real app:
+
+- **Android (Chrome):** open the link → tap the "⋮" menu → **Add to Home
+  screen** / **Install app**
+- **iPhone (Safari):** open the link → tap the Share icon → **Add to Home
+  Screen**
+
+It'll then launch full-screen with your logo as the icon, no browser address
+bar. This works because of three extra files included in this repo —
+`manifest.json`, `service-worker.js`, `icon-192.png`, `icon-512.png` — make
+sure all of them get uploaded to GitHub alongside `index.html`, in the same
+folder. These files won't do anything while just testing inside Claude's
+preview; the "Add to Home Screen" install prompt only appears once it's
+actually hosted over HTTPS (e.g. your GitHub Pages link).
