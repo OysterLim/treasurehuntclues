@@ -44,6 +44,66 @@
     padding:48px 20px 80px;
   }
   .stage{width:100%;max-width:560px;}
+  body.has-admin-tabbar{padding-bottom:88px;}
+  .admin-tabbar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    display:flex;
+    background:var(--card);
+    border-top:1px solid var(--hairline);
+    z-index:50;
+    padding-bottom:env(safe-area-inset-bottom, 0);
+  }
+  .admin-tab{
+    flex:1;
+    background:none;
+    border:none;
+    color:var(--text-faint);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.04em;
+    padding:12px 4px 10px;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+  }
+  .admin-tab .tab-icon{font-size:16px;line-height:1;}
+  .admin-tab.active{color:var(--accent);}
+  .admin-tab.active .tab-icon{color:var(--accent);}
+
+  @media (min-width: 860px){
+    body.has-admin-tabbar{
+      padding-bottom:48px;
+      padding-left:208px;
+    }
+    .admin-tabbar{
+      top:0;bottom:0;left:0;right:auto;
+      width:188px;
+      flex-direction:column;
+      justify-content:flex-start;
+      border-top:none;
+      border-right:1px solid var(--hairline);
+      padding:28px 0 20px;
+      gap:2px;
+    }
+    .admin-tab{
+      flex:none;
+      flex-direction:row;
+      justify-content:flex-start;
+      align-items:center;
+      gap:12px;
+      padding:13px 22px;
+      font-size:12px;
+      border-left:2px solid transparent;
+    }
+    .admin-tab.active{
+      background:var(--card-raised);
+      border-left:2px solid var(--accent);
+    }
+    .admin-tab .tab-icon{font-size:17px;}
+  }
   .eyebrow{
     font-family:'IBM Plex Mono',monospace;
     font-size:11px;
@@ -341,7 +401,7 @@ if(!NEEDS_SETUP){
   db = getFirestore(app);
 }
 
-let state = { view: 'role', team: null, error: '', adminUnlocked: false, showHistory: false, notice: '', pendingCodeValue: '' };
+let state = { view: 'role', team: null, error: '', adminUnlocked: false, showHistory: false, notice: '', pendingCodeValue: '', adminTab: 'leaderboard' };
 
 const SESSION_KEY = 'clue-hunt-session';
 function persistTeamSession(slug){
@@ -457,8 +517,9 @@ async function deleteTeam(slug){
 
 function render(){
   const app = document.getElementById('app');
+  document.body.classList.toggle('has-admin-tabbar', state.view === 'admin' && !NEEDS_SETUP);
   if(NEEDS_SETUP){ app.innerHTML = viewSetupNeeded(); return; }
-  if(state.view === 'role') app.innerHTML = viewRole();
+  if(state.view === 'role') renderRole();
   else if(state.view === 'join') app.innerHTML = viewJoin();
   else if(state.view === 'play') renderPlay();
   else if(state.view === 'adminGate') app.innerHTML = viewAdminGate();
@@ -489,20 +550,46 @@ function bindGlobal(){
   });
 }
 
-function viewRole(){
-  return `
+async function renderRole(){
+  stopScanner();
+  clearCountdownTimer();
+  const app = document.getElementById('app');
+  const cfg = await getConfig();
+  const now = Date.now();
+  const notStarted = !!(cfg.eventStart && now < cfg.eventStart);
+  const ended = !!(cfg.eventEnd && now > cfg.eventEnd);
+  const joinBlocked = notStarted || ended;
+
+  app.innerHTML = `
     <p class="eyebrow">Storyline hunt</p>
     <h1>The Case File</h1>
     <p class="sub">Enter codes found around the venue to unlock the next part of the story.</p>
     <div class="folder">
       <div class="row" style="margin-bottom:12px;">
-        <button class="btn-primary" data-nav="join">Join as a team</button>
+        <button class="btn-primary" id="join-team-btn" ${joinBlocked ? 'disabled' : ''}>Join as a team</button>
       </div>
       <div class="row">
         <button class="btn-ghost" data-nav="adminGate">Admin</button>
       </div>
+      ${notStarted ? `
+        <p class="hint" style="margin-top:16px;">The hunt hasn't started yet — hang tight!</p>
+        <p class="sub" id="countdown-display" style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--accent);margin-top:6px;"></p>
+      ` : ''}
+      ${ended ? `<p class="hint" style="margin-top:16px;">This hunt has ended. Contact your organizer for results.</p>` : ''}
     </div>
   `;
+  bindGlobal();
+
+  const joinBtn = document.getElementById('join-team-btn');
+  if(joinBtn && !joinBlocked){
+    joinBtn.onclick = () => {
+      state.view = 'join'; state.error=''; state.notice=''; state.pendingCodeValue=''; state.showHistory=false; render();
+    };
+  }
+
+  if(notStarted){
+    startCountdown(cfg.eventStart, () => { renderRole(); });
+  }
 }
 
 function viewJoin(){
@@ -734,15 +821,10 @@ async function renderAdmin(){
 
   const clueRows = (cfg.clues || []).map((c,i) => buildClueRowHtml(c)).join('');
   const teamRows = teams.map(t => buildTeamRowHtml(t)).join('');
-
   const leaderboardRows = buildLeaderboardRows(cfg, teams);
+  const tab = state.adminTab || 'leaderboard';
 
-  app.innerHTML = `
-    <button class="back" data-nav="role">&larr; exit admin</button>
-    <p class="eyebrow">Admin</p>
-    <h1>Manage the hunt</h1>
-    <p class="sub">Edit codes and clues, then save. Changes apply to all teams immediately.</p>
-
+  const leaderboardPane = `
     <div class="section-title" style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <span>Live leaderboard</span>
       <button class="btn-ghost" id="refresh-leaderboard" style="width:auto;padding:6px 12px;font-size:11px;margin:0;">Refresh</button>
@@ -755,8 +837,10 @@ async function renderAdmin(){
       </table>
       <p class="hint" id="leaderboard-refresh-msg"></p>
     </div>
+  `;
 
-    <div class="section-title">Teams and passwords</div>
+  const teamsPane = `
+    <div class="section-title" style="margin-top:0;">Teams and passwords</div>
     <div class="folder">
       <p class="sub" style="margin-bottom:14px;">Only teams listed here can join. Give each team its name and password.</p>
       <input type="text" id="team-search" placeholder="Search teams…" style="margin-bottom:12px;">
@@ -765,8 +849,20 @@ async function renderAdmin(){
       <button class="btn-primary" id="save-teams">Save teams</button>
       <p class="hint" id="teams-save-msg"></p>
     </div>
+  `;
 
-    <div class="section-title">Event details and clues</div>
+  const cluesPane = `
+    <div class="section-title" style="margin-top:0;">Clues in order</div>
+    <div class="folder">
+      <div id="clue-list">${clueRows}</div>
+      <button class="btn-ghost" id="add-clue" style="margin-bottom:16px;">+ Add clue</button>
+      <button class="btn-primary" id="save-cfg">Save changes</button>
+      <p class="hint" id="save-msg"></p>
+    </div>
+  `;
+
+  const settingsPane = `
+    <div class="section-title" style="margin-top:0;">Event details</div>
     <div class="folder">
       <label>Event title</label>
       <input type="text" id="cfg-title" value="${escapeAttr(cfg.title)}">
@@ -778,13 +874,8 @@ async function renderAdmin(){
       <input type="datetime-local" id="cfg-start" value="${escapeAttr(toDatetimeLocalValue(cfg.eventStart))}">
       <label>Event end (optional — locks code entry after this time)</label>
       <input type="datetime-local" id="cfg-end" value="${escapeAttr(toDatetimeLocalValue(cfg.eventEnd))}" style="margin-bottom:14px;">
-
-      <div class="section-title">Clues in order</div>
-      <div id="clue-list">${clueRows}</div>
-      <button class="btn-ghost" id="add-clue" style="margin-bottom:16px;">+ Add clue</button>
-
-      <button class="btn-primary" id="save-cfg">Save changes</button>
-      <p class="hint" id="save-msg"></p>
+      <button class="btn-primary" id="save-cfg-settings">Save changes</button>
+      <p class="hint" id="save-msg-settings"></p>
     </div>
 
     <div class="section-title">Reset event</div>
@@ -801,8 +892,42 @@ async function renderAdmin(){
       <p class="hint" id="reset-msg"></p>
     </div>
   `;
+
+  const panes = { leaderboard: leaderboardPane, teams: teamsPane, clues: cluesPane, settings: settingsPane };
+  const titles = { leaderboard: 'Live leaderboard', teams: 'Teams and passwords', clues: 'Clues in order', settings: 'Event details' };
+
+  app.innerHTML = `
+    <button class="back" data-nav="role">&larr; exit admin</button>
+    <p class="eyebrow">Admin</p>
+    <h1>Manage the hunt</h1>
+    <p class="sub">${titles[tab] || ''}</p>
+
+    ${panes[tab] || ''}
+
+    <div class="admin-tabbar">
+      <button class="admin-tab ${tab==='leaderboard'?'active':''}" data-admin-tab="leaderboard">
+        <span class="tab-icon">&#9733;</span>Leaderboard
+      </button>
+      <button class="admin-tab ${tab==='teams'?'active':''}" data-admin-tab="teams">
+        <span class="tab-icon">&#128101;</span>Teams
+      </button>
+      <button class="admin-tab ${tab==='clues'?'active':''}" data-admin-tab="clues">
+        <span class="tab-icon">&#128273;</span>Clues
+      </button>
+      <button class="admin-tab ${tab==='settings'?'active':''}" data-admin-tab="settings">
+        <span class="tab-icon">&#9881;</span>Others
+      </button>
+    </div>
+  `;
   bindGlobal();
   bindAdminActions(cfg, teams);
+
+  document.querySelectorAll('[data-admin-tab]').forEach(btn => {
+    btn.onclick = () => {
+      state.adminTab = btn.getAttribute('data-admin-tab');
+      renderAdmin();
+    };
+  });
 
   const refreshBtn = document.getElementById('refresh-leaderboard');
   if(refreshBtn){
@@ -969,117 +1094,157 @@ function compressImage(file){
 }
 
 function bindAdminActions(cfg, teams){
-  document.getElementById('add-clue').onclick = () => {
-    const list = document.getElementById('clue-list');
-    const div = document.createElement('div');
-    div.innerHTML = buildClueRowHtml({});
-    const row = div.firstElementChild;
-    list.appendChild(row);
-    attachRowHandlers(row);
-  };
+  const addClueBtn = document.getElementById('add-clue');
+  if(addClueBtn){
+    addClueBtn.onclick = () => {
+      const list = document.getElementById('clue-list');
+      const div = document.createElement('div');
+      div.innerHTML = buildClueRowHtml({});
+      const row = div.firstElementChild;
+      list.appendChild(row);
+      attachRowHandlers(row);
+    };
+  }
   document.querySelectorAll('.clue-row').forEach(attachRowHandlers);
 
-  document.getElementById('add-team').onclick = () => {
-    const list = document.getElementById('team-list');
-    const div = document.createElement('div');
-    div.innerHTML = buildTeamRowHtml({});
-    const row = div.firstElementChild;
-    list.appendChild(row);
-    row.querySelector('.remove-team').onclick = () => row.remove();
-  };
+  const addTeamBtn = document.getElementById('add-team');
+  if(addTeamBtn){
+    addTeamBtn.onclick = () => {
+      const list = document.getElementById('team-list');
+      const div = document.createElement('div');
+      div.innerHTML = buildTeamRowHtml({});
+      const row = div.firstElementChild;
+      list.appendChild(row);
+      row.querySelector('.remove-team').onclick = () => row.remove();
+    };
+  }
   document.querySelectorAll('.team-row').forEach(row => {
     row.querySelector('.remove-team').onclick = () => row.remove();
   });
 
-  document.getElementById('save-teams').onclick = async () => {
-    const saveBtn = document.getElementById('save-teams');
-    const rows = Array.from(document.querySelectorAll('.team-row'));
-    const newSlugs = new Set();
-    const writes = [];
-    rows.forEach(row => {
-      const name = row.querySelector('.team-name-field').value.trim();
-      const password = row.querySelector('.team-password-field').value.trim();
-      if(!name) return;
-      const slug = slugify(name);
-      newSlugs.add(slug);
-      const existing = teams.find(t => t.slug === slug) || {};
-      const data = {
-        name,
-        password,
-        found: existing.found || [],
-        history: existing.history || [],
-        startedAt: existing.startedAt || null,
-        finishedAt: existing.finishedAt || null
-      };
-      writes.push(saveTeam(slug, data));
-    });
-    const toRemove = teams.filter(t => !newSlugs.has(t.slug));
-    toRemove.forEach(t => writes.push(deleteTeam(t.slug)));
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving…';
-    try{
-      await Promise.all(writes);
-      await renderAdmin();
-      const msgEl = document.getElementById('teams-save-msg');
-      if(msgEl) msgEl.textContent = 'Saved.';
-    }catch(e){
-      document.getElementById('teams-save-msg').textContent = 'Save failed — check your connection and try again.';
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save teams';
-    }
-  };
-
-  document.getElementById('save-cfg').onclick = async () => {
-    const newClues = Array.from(document.querySelectorAll('.clue-row')).map(row => ({
-      id: row.getAttribute('data-id') || null,
-      name: row.querySelector('.clue-name').value.trim(),
-      code: row.querySelector('.clue-code').value.trim(),
-      location: row.querySelector('.clue-location').value.trim(),
-      text: row.querySelector('.clue-text').value.trim(),
-      photos: (() => { try{ return JSON.parse(row.querySelector('.clue-photo-data').value || '[]'); }catch(e){ return []; } })()
-    })).filter(c => c.code);
-    const startVal = document.getElementById('cfg-start').value;
-    const endVal = document.getElementById('cfg-end').value;
-    const newCfg = {
-      title: document.getElementById('cfg-title').value.trim() || 'The Case File',
-      intro: document.getElementById('cfg-intro').value.trim(),
-      pin: document.getElementById('cfg-pin').value.trim() || '1234',
-      eventStart: startVal ? new Date(startVal).getTime() : null,
-      eventEnd: endVal ? new Date(endVal).getTime() : null,
-      clues: newClues
+  const saveTeamsBtn = document.getElementById('save-teams');
+  if(saveTeamsBtn){
+    saveTeamsBtn.onclick = async () => {
+      const rows = Array.from(document.querySelectorAll('.team-row'));
+      const newSlugs = new Set();
+      const writes = [];
+      rows.forEach(row => {
+        const name = row.querySelector('.team-name-field').value.trim();
+        const password = row.querySelector('.team-password-field').value.trim();
+        if(!name) return;
+        const slug = slugify(name);
+        newSlugs.add(slug);
+        const existing = teams.find(t => t.slug === slug) || {};
+        const data = {
+          name,
+          password,
+          found: existing.found || [],
+          history: existing.history || [],
+          startedAt: existing.startedAt || null,
+          finishedAt: existing.finishedAt || null
+        };
+        writes.push(saveTeam(slug, data));
+      });
+      const toRemove = teams.filter(t => !newSlugs.has(t.slug));
+      toRemove.forEach(t => writes.push(deleteTeam(t.slug)));
+      saveTeamsBtn.disabled = true;
+      saveTeamsBtn.textContent = 'Saving…';
+      try{
+        await Promise.all(writes);
+        await renderAdmin();
+        const msgEl = document.getElementById('teams-save-msg');
+        if(msgEl) msgEl.textContent = 'Saved.';
+      }catch(e){
+        document.getElementById('teams-save-msg').textContent = 'Save failed — check your connection and try again.';
+        saveTeamsBtn.disabled = false;
+        saveTeamsBtn.textContent = 'Save teams';
+      }
     };
-    const previousClueIds = (cfg.clues || []).map(c => c.id).filter(Boolean);
-    const saveBtn = document.getElementById('save-cfg');
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving…';
-    try{
-      await saveConfig(newCfg, previousClueIds);
-      invalidateConfigCache();
-      await renderAdmin();
-      const msgEl = document.getElementById('save-msg');
-      if(msgEl) msgEl.textContent = 'Saved.';
-    }catch(e){
-      document.getElementById('save-msg').textContent = 'Save failed — photos may be too large, or check your connection.';
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save changes';
-    }
-  };
+  }
 
-  document.getElementById('reset-event').onclick = () => {
-    document.getElementById('reset-confirm').style.display = 'block';
-  };
-  document.getElementById('reset-confirm-no').onclick = () => {
-    document.getElementById('reset-confirm').style.display = 'none';
-  };
-  document.getElementById('reset-confirm-yes').onclick = async () => {
-    const allTeams = await getAllTeams();
-    await Promise.all(allTeams.map(t => saveTeam(t.slug, {
-      name: t.name, password: t.password || '', found: [], history: [], startedAt: null, finishedAt: null
-    })));
-    document.getElementById('reset-confirm').style.display = 'none';
-    document.getElementById('reset-msg').textContent = 'All team progress cleared. Teams and passwords were kept.';
-    refreshLeaderboardOnly();
-  };
+  const saveCluesBtn = document.getElementById('save-cfg');
+  if(saveCluesBtn){
+    saveCluesBtn.onclick = async () => {
+      const newClues = Array.from(document.querySelectorAll('.clue-row')).map(row => ({
+        id: row.getAttribute('data-id') || null,
+        name: row.querySelector('.clue-name').value.trim(),
+        code: row.querySelector('.clue-code').value.trim(),
+        location: row.querySelector('.clue-location').value.trim(),
+        text: row.querySelector('.clue-text').value.trim(),
+        photos: (() => { try{ return JSON.parse(row.querySelector('.clue-photo-data').value || '[]'); }catch(e){ return []; } })()
+      })).filter(c => c.code);
+      const newCfg = {
+        title: cfg.title,
+        intro: cfg.intro,
+        pin: cfg.pin,
+        eventStart: cfg.eventStart || null,
+        eventEnd: cfg.eventEnd || null,
+        clues: newClues
+      };
+      const previousClueIds = (cfg.clues || []).map(c => c.id).filter(Boolean);
+      saveCluesBtn.disabled = true;
+      saveCluesBtn.textContent = 'Saving…';
+      try{
+        await saveConfig(newCfg, previousClueIds);
+        invalidateConfigCache();
+        await renderAdmin();
+        const msgEl = document.getElementById('save-msg');
+        if(msgEl) msgEl.textContent = 'Saved.';
+      }catch(e){
+        document.getElementById('save-msg').textContent = 'Save failed — photos may be too large, or check your connection.';
+        saveCluesBtn.disabled = false;
+        saveCluesBtn.textContent = 'Save changes';
+      }
+    };
+  }
+
+  const saveSettingsBtn = document.getElementById('save-cfg-settings');
+  if(saveSettingsBtn){
+    saveSettingsBtn.onclick = async () => {
+      const startVal = document.getElementById('cfg-start').value;
+      const endVal = document.getElementById('cfg-end').value;
+      const newCfg = {
+        title: document.getElementById('cfg-title').value.trim() || 'The Case File',
+        intro: document.getElementById('cfg-intro').value.trim(),
+        pin: document.getElementById('cfg-pin').value.trim() || '1234',
+        eventStart: startVal ? new Date(startVal).getTime() : null,
+        eventEnd: endVal ? new Date(endVal).getTime() : null,
+        clues: cfg.clues || []
+      };
+      const previousClueIds = (cfg.clues || []).map(c => c.id).filter(Boolean);
+      saveSettingsBtn.disabled = true;
+      saveSettingsBtn.textContent = 'Saving…';
+      try{
+        await saveConfig(newCfg, previousClueIds);
+        invalidateConfigCache();
+        await renderAdmin();
+        const msgEl = document.getElementById('save-msg-settings');
+        if(msgEl) msgEl.textContent = 'Saved.';
+      }catch(e){
+        document.getElementById('save-msg-settings').textContent = 'Save failed — check your connection and try again.';
+        saveSettingsBtn.disabled = false;
+        saveSettingsBtn.textContent = 'Save changes';
+      }
+    };
+  }
+
+  const resetEventBtn = document.getElementById('reset-event');
+  if(resetEventBtn){
+    resetEventBtn.onclick = () => {
+      document.getElementById('reset-confirm').style.display = 'block';
+    };
+    document.getElementById('reset-confirm-no').onclick = () => {
+      document.getElementById('reset-confirm').style.display = 'none';
+    };
+    document.getElementById('reset-confirm-yes').onclick = async () => {
+      const allTeams = await getAllTeams();
+      await Promise.all(allTeams.map(t => saveTeam(t.slug, {
+        name: t.name, password: t.password || '', found: [], history: [], startedAt: null, finishedAt: null
+      })));
+      document.getElementById('reset-confirm').style.display = 'none';
+      document.getElementById('reset-msg').textContent = 'All team progress cleared. Teams and passwords were kept.';
+    };
+  }
 }
 
 function attachRowHandlers(row){
