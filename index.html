@@ -44,8 +44,8 @@
     padding:48px 20px 80px;
   }
   .stage{width:100%;max-width:560px;}
-  body.has-admin-tabbar{padding-bottom:88px;}
-  .admin-tabbar{
+  body.has-tabbar{padding-bottom:88px;}
+  .app-tabbar{
     position:fixed;
     bottom:0;left:0;right:0;
     display:flex;
@@ -54,7 +54,7 @@
     z-index:50;
     padding-bottom:env(safe-area-inset-bottom, 0);
   }
-  .admin-tab{
+  .app-tab{
     flex:1;
     background:none;
     border:none;
@@ -68,17 +68,32 @@
     flex-direction:column;
     align-items:center;
     gap:4px;
+    position:relative;
   }
-  .admin-tab .tab-icon{font-size:16px;line-height:1;}
-  .admin-tab.active{color:var(--accent);}
-  .admin-tab.active .tab-icon{color:var(--accent);}
+  .app-tab .tab-icon{font-size:16px;line-height:1;position:relative;}
+  .app-tab.active{color:var(--accent);}
+  .app-tab.active .tab-icon{color:var(--accent);}
+  .tab-badge{
+    position:absolute;
+    top:-4px;right:-9px;
+    min-width:15px;height:15px;
+    padding:0 3px;
+    border-radius:8px;
+    background:var(--danger);
+    color:#fff;
+    font-size:9px;
+    line-height:15px;
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    box-shadow:0 0 0 2px var(--card);
+  }
 
   @media (min-width: 860px){
-    body.has-admin-tabbar{
+    body.has-tabbar{
       padding-bottom:48px;
       padding-left:208px;
     }
-    .admin-tabbar{
+    .app-tabbar{
       top:0;bottom:0;left:0;right:auto;
       width:188px;
       flex-direction:column;
@@ -88,7 +103,7 @@
       padding:28px 0 20px;
       gap:2px;
     }
-    .admin-tab{
+    .app-tab{
       flex:none;
       flex-direction:row;
       justify-content:flex-start;
@@ -98,12 +113,96 @@
       font-size:12px;
       border-left:2px solid transparent;
     }
-    .admin-tab.active{
+    .app-tab.active{
       background:var(--card-raised);
       border-left:2px solid var(--accent);
     }
-    .admin-tab .tab-icon{font-size:17px;}
+    .app-tab .tab-icon{font-size:17px;}
+    .tab-badge{top:10px;right:14px;}
   }
+
+  /* Screen transition */
+  @keyframes screenFadeIn{
+    from{opacity:0;transform:translateY(6px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+  .screen-fade{animation:screenFadeIn 0.28s ease both;}
+
+  /* Paper texture for folder panels and clue cards */
+  .folder, .clue-box{
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px),
+      radial-gradient(ellipse at top left, rgba(198,161,91,0.035), transparent 55%);
+  }
+
+  /* Unlock stamp animation */
+  .unlock-stamp{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    gap:10px;
+    padding:22px 10px 26px;
+    margin-bottom:16px;
+    border:1px solid var(--accent-dim);
+    border-radius:3px;
+    background:radial-gradient(ellipse at center, rgba(198,161,91,0.07), transparent 70%);
+    animation:stampIn 0.45s cubic-bezier(.22,1.4,.4,1) both;
+  }
+  .unlock-stamp .stamp-ring{
+    width:56px;height:56px;
+    border:2px solid var(--accent);
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:24px;
+    color:var(--accent);
+    transform:rotate(-8deg);
+  }
+  .unlock-stamp .stamp-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;letter-spacing:0.16em;text-transform:uppercase;
+    color:var(--accent-dim);
+  }
+  .unlock-stamp .stamp-name{
+    font-family:'Cormorant Garamond',serif;
+    font-size:22px;color:var(--text);
+  }
+  @keyframes stampIn{
+    0%{opacity:0;transform:scale(1.4) rotate(-6deg);}
+    60%{opacity:1;transform:scale(0.94) rotate(1deg);}
+    100%{opacity:1;transform:scale(1) rotate(0);}
+  }
+
+  /* Clue grid polish */
+  .clue-grid .clue-box{
+    position:relative;
+    transition:transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .clue-grid .clue-box:hover{
+    transform:translateY(-2px);
+    box-shadow:0 6px 16px rgba(0,0,0,0.35);
+    border-left-color:var(--accent);
+  }
+  .clue-grid .clue-box .page-num{
+    position:absolute;
+    top:8px;right:10px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:8.5px;
+    color:var(--text-faint);
+    letter-spacing:0.04em;
+  }
+  .location-pill{
+    display:inline-block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:9.5px;
+    letter-spacing:0.05em;
+    color:var(--accent-dim);
+    border:1px solid var(--hairline);
+    border-radius:20px;
+    padding:2px 9px;
+    margin-bottom:6px;
+  }
+
   .eyebrow{
     font-family:'IBM Plex Mono',monospace;
     font-size:11px;
@@ -401,7 +500,7 @@ if(!NEEDS_SETUP){
   db = getFirestore(app);
 }
 
-let state = { view: 'role', team: null, error: '', adminUnlocked: false, showHistory: false, notice: '', pendingCodeValue: '', adminTab: 'leaderboard' };
+let state = { view: 'role', team: null, error: '', adminUnlocked: false, notice: '', pendingCodeValue: '', adminTab: 'leaderboard', teamTab: 'hunt' };
 
 const SESSION_KEY = 'clue-hunt-session';
 function persistTeamSession(slug){
@@ -517,7 +616,7 @@ async function deleteTeam(slug){
 
 function render(){
   const app = document.getElementById('app');
-  document.body.classList.toggle('has-admin-tabbar', state.view === 'admin' && !NEEDS_SETUP);
+  document.body.classList.remove('has-tabbar');
   if(NEEDS_SETUP){ app.innerHTML = viewSetupNeeded(); return; }
   if(state.view === 'role') renderRole();
   else if(state.view === 'join') app.innerHTML = viewJoin();
@@ -529,11 +628,13 @@ function render(){
 
 function viewSetupNeeded(){
   return `
-    <p class="eyebrow">Setup needed</p>
-    <h1>Connect a backend first</h1>
-    <p class="sub">This app needs a free Firebase project so team progress can save and sync. See the README that came with this file for step-by-step setup — then paste your config into the firebaseConfig object near the top of the &lt;script&gt; tag.</p>
-    <div class="folder">
-      <p class="hint">Steps: create a Firebase project → enable Firestore → create a web app → copy the config object → paste it in place of the placeholder values in this file → set Firestore rules to allow read/write → redeploy.</p>
+    <div class="screen-fade">
+      <p class="eyebrow">Setup needed</p>
+      <h1>Connect a backend first</h1>
+      <p class="sub">This app needs a free Firebase project so team progress can save and sync. See the README that came with this file for step-by-step setup — then paste your config into the firebaseConfig object near the top of the &lt;script&gt; tag.</p>
+      <div class="folder">
+        <p class="hint">Steps: create a Firebase project → enable Firestore → create a web app → copy the config object → paste it in place of the placeholder values in this file → set Firestore rules to allow read/write → redeploy.</p>
+      </div>
     </div>
   `;
 }
@@ -545,7 +646,7 @@ function bindGlobal(){
       clearCountdownTimer();
       const target = el.getAttribute('data-nav');
       if(target === 'role'){ clearTeamSession(); }
-      state.view = target; state.error=''; state.notice=''; state.pendingCodeValue=''; state.showHistory=false; render();
+      state.view = target; state.error=''; state.notice=''; state.pendingCodeValue=''; state.teamTab='hunt'; render();
     };
   });
 }
@@ -561,21 +662,23 @@ async function renderRole(){
   const joinBlocked = notStarted || ended;
 
   app.innerHTML = `
-    <p class="eyebrow">Storyline hunt</p>
-    <h1>The Case File</h1>
-    <p class="sub">Enter codes found around the venue to unlock the next part of the story.</p>
-    <div class="folder">
-      <div class="row" style="margin-bottom:12px;">
-        <button class="btn-primary" id="join-team-btn" ${joinBlocked ? 'disabled' : ''}>Join as a team</button>
+    <div class="screen-fade">
+      <p class="eyebrow">Storyline hunt</p>
+      <h1>The Case File</h1>
+      <p class="sub">Enter codes found around the venue to unlock the next part of the story.</p>
+      <div class="folder">
+        <div class="row" style="margin-bottom:12px;">
+          <button class="btn-primary" id="join-team-btn" ${joinBlocked ? 'disabled' : ''}>Join as a team</button>
+        </div>
+        <div class="row">
+          <button class="btn-ghost" data-nav="adminGate">Admin</button>
+        </div>
+        ${notStarted ? `
+          <p class="hint" style="margin-top:16px;">The hunt hasn't started yet — hang tight!</p>
+          <p class="sub" id="countdown-display" style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--accent);margin-top:6px;"></p>
+        ` : ''}
+        ${ended ? `<p class="hint" style="margin-top:16px;">This hunt has ended. Contact your organizer for results.</p>` : ''}
       </div>
-      <div class="row">
-        <button class="btn-ghost" data-nav="adminGate">Admin</button>
-      </div>
-      ${notStarted ? `
-        <p class="hint" style="margin-top:16px;">The hunt hasn't started yet — hang tight!</p>
-        <p class="sub" id="countdown-display" style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--accent);margin-top:6px;"></p>
-      ` : ''}
-      ${ended ? `<p class="hint" style="margin-top:16px;">This hunt has ended. Contact your organizer for results.</p>` : ''}
     </div>
   `;
   bindGlobal();
@@ -583,7 +686,7 @@ async function renderRole(){
   const joinBtn = document.getElementById('join-team-btn');
   if(joinBtn && !joinBlocked){
     joinBtn.onclick = () => {
-      state.view = 'join'; state.error=''; state.notice=''; state.pendingCodeValue=''; state.showHistory=false; render();
+      state.view = 'join'; state.error=''; state.notice=''; state.pendingCodeValue=''; state.teamTab='hunt'; render();
     };
   }
 
@@ -594,17 +697,19 @@ async function renderRole(){
 
 function viewJoin(){
   return `
-    <button class="back" data-nav="role">&larr; back</button>
-    <p class="eyebrow">Step 1</p>
-    <h1>Enter your team details</h1>
-    <p class="sub">Use the team name and password given by your organizer.</p>
-    <div class="folder">
-      <label>Team name</label>
-      <input type="text" id="team-name" placeholder="e.g. The Falcons" autofocus>
-      <label>Password</label>
-      <input type="text" id="team-password" placeholder="Team password">
-      ${state.error ? `<div class="error-msg">${state.error}</div>` : ''}
-      <button class="btn-primary" id="join-btn">Enter the hunt</button>
+    <div class="screen-fade">
+      <button class="back" data-nav="role">&larr; back</button>
+      <p class="eyebrow">Step 1</p>
+      <h1>Enter your team details</h1>
+      <p class="sub">Use the team name and password given by your organizer.</p>
+      <div class="folder">
+        <label>Team name</label>
+        <input type="text" id="team-name" placeholder="e.g. The Falcons" autofocus>
+        <label>Password</label>
+        <input type="text" id="team-password" placeholder="Team password">
+        ${state.error ? `<div class="error-msg">${state.error}</div>` : ''}
+        <button class="btn-primary" id="join-btn">Enter the hunt</button>
+      </div>
     </div>
   `;
 }
@@ -638,6 +743,23 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+function teamUnviewedCount(team){
+  const found = (team && team.found) || [];
+  const viewed = (team && team.viewedCount) || 0;
+  return Math.max(0, found.length - viewed);
+}
+
+async function markCluesViewed(team){
+  if(teamUnviewedCount(team) === 0) return;
+  team.viewedCount = team.found.length;
+  try{
+    await saveTeam(team.slug, {
+      name: team.name, password: team.password || '', found: team.found, history: team.history || [],
+      startedAt: team.startedAt || null, finishedAt: team.finishedAt || null, viewedCount: team.viewedCount
+    });
+  }catch(e){}
+}
+
 async function renderPlay(){
   stopScanner();
   clearCountdownTimer();
@@ -654,13 +776,16 @@ async function renderPlay(){
   const ended = !!(cfg.eventEnd && now > cfg.eventEnd);
 
   if(notStarted){
+    document.body.classList.remove('has-tabbar');
     app.innerHTML = `
-      <button class="back" data-nav="role">&larr; leave</button>
-      <p class="eyebrow">Team file</p>
-      <h1>${escapeHtml(team.name)}</h1>
-      <div class="folder">
-        <p class="hint" style="margin-bottom:12px;">The hunt hasn't started yet — hang tight!</p>
-        <p class="sub" id="countdown-display" style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--accent);"></p>
+      <div class="screen-fade">
+        <button class="back" data-nav="role">&larr; leave</button>
+        <p class="eyebrow">Team file</p>
+        <h1>${escapeHtml(team.name)}</h1>
+        <div class="folder">
+          <p class="hint" style="margin-bottom:12px;">The hunt hasn't started yet — hang tight!</p>
+          <p class="sub" id="countdown-display" style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:var(--accent);"></p>
+        </div>
       </div>
     `;
     bindGlobal();
@@ -668,59 +793,81 @@ async function renderPlay(){
     return;
   }
 
+  const teamTab = state.teamTab || 'hunt';
   const dots = clues.map(c => `<div class="dot ${team.found.includes(c.id) ? 'filled':''}"></div>`).join('');
+  const unviewed = teamUnviewedCount(team);
 
-  if(state.showHistory){
+  let paneHtml;
+  if(teamTab === 'clues'){
     const found = clues.filter(c => team.found.includes(c.id));
-    const historyHtml = found.length
-      ? `<div class="clue-grid">${found.map(c => `
+    paneHtml = found.length
+      ? `<div class="clue-grid">${found.map((c, idx) => `
           <div class="clue-box">
+            <span class="page-num">${idx+1}/${found.length}</span>
             <span class="tag">${escapeHtml(c.name || 'Clue')}</span>
             ${renderClueBody(c)}
           </div>
         `).join('')}</div>`
-      : `<p class="hint">No clues found yet — enter a code to begin.</p>`;
+      : `<p class="hint">No clues found yet — enter a code on the Hunt tab to begin.</p>`;
+  } else {
+    const showStamp = state.notice && state.notice.indexOf('Unlocked: ') === 0;
+    const noticeHtml = showStamp
+      ? `<div class="unlock-stamp"><div class="stamp-ring">&#10003;</div><span class="stamp-label">Clue unlocked</span><span class="stamp-name">${escapeHtml(state.notice.replace('Unlocked: ','').replace(/!$/,''))}</span></div>`
+      : (state.notice ? `<div class="notice-msg">${escapeHtml(state.notice)}</div>` : '');
 
-    app.innerHTML = `
+    paneHtml = ended ? `
+      <p class="hint">This hunt has ended — no more codes can be submitted. Check "Your Clues" to review what your team found.</p>
+    ` : `
+      <label>Enter a code</label>
+      <input type="text" id="code-input" placeholder="Type the code here" value="${escapeAttr(state.pendingCodeValue || '')}" autofocus>
+      ${state.error ? `<div class="error-msg">${state.error}</div>` : ''}
+      ${noticeHtml}
+      <div class="row">
+        <button class="btn-primary" id="submit-code">Unlock clue</button>
+        <button class="btn-ghost" id="scan-btn" style="flex:none;width:auto;padding:12px 18px;">Scan code</button>
+      </div>
+      <div id="scanner-panel"></div>
+      ${doneCount === 0 && !finished ? `<p class="hint" style="margin-top:14px;">${escapeHtml(cfg.intro)}</p>` : ''}
+      ${finished ? `<p class="hint" style="margin-top:14px;">You're caught up on every code released so far. Try a new one whenever it's announced.</p>` : ''}
+    `;
+  }
+
+  document.body.classList.add('has-tabbar');
+  app.innerHTML = `
+    <div class="screen-fade">
       <button class="back" data-nav="role">&larr; leave</button>
       <p class="eyebrow">Team file</p>
       <h1>${escapeHtml(team.name)}</h1>
-      <p class="sub">${found.length} clue${found.length===1?'':'s'} found so far.</p>
-      <button class="btn-ghost" id="back-to-hunt" style="margin-bottom:20px;">&larr; Back to hunt</button>
-      ${historyHtml}
-    `;
-    bindGlobal();
-    document.getElementById('back-to-hunt').onclick = () => { state.showHistory = false; renderPlay(); };
-    return;
-  }
-
-  const mainHtml = ended ? `
-    <p class="hint">This hunt has ended — no more codes can be submitted. Check "Your clues" below to review what your team found.</p>
-  ` : `
-    <label>Enter a code</label>
-    <input type="text" id="code-input" placeholder="Type the code here" value="${escapeAttr(state.pendingCodeValue || '')}" autofocus>
-    ${state.error ? `<div class="error-msg">${state.error}</div>` : ''}
-    ${state.notice ? `<div class="notice-msg">${escapeHtml(state.notice)}</div>` : ''}
-    <div class="row">
-      <button class="btn-primary" id="submit-code">Unlock clue</button>
-      <button class="btn-ghost" id="scan-btn" style="flex:none;width:auto;padding:12px 18px;">Scan code</button>
+      <p class="sub">${ended ? 'Hunt has ended.' : finished ? 'All current clues found.' : `${total - doneCount} clue${total-doneCount===1?'':'s'} remaining.`}</p>
+      <div class="dots">${dots}</div>
+      <div class="folder">${paneHtml}</div>
     </div>
-    <div id="scanner-panel"></div>
-    ${doneCount === 0 && !finished ? `<p class="hint" style="margin-top:14px;">${escapeHtml(cfg.intro)}</p>` : ''}
-    ${finished ? `<p class="hint" style="margin-top:14px;">You're caught up on every code released so far. Try a new one whenever it's announced.</p>` : ''}
-  `;
 
-  app.innerHTML = `
-    <button class="back" data-nav="role">&larr; leave</button>
-    <p class="eyebrow">Team file</p>
-    <h1>${escapeHtml(team.name)}</h1>
-    <p class="sub">${ended ? 'Hunt has ended.' : finished ? 'All current clues found.' : `${total - doneCount} clue${total-doneCount===1?'':'s'} remaining.`}</p>
-    <div class="dots">${dots}</div>
-    <div class="folder">${mainHtml}</div>
-    <button class="btn-ghost" id="your-clues-btn" style="margin-top:16px;">Your clues (${doneCount})</button>
+    <div class="app-tabbar">
+      <button class="app-tab ${teamTab==='hunt'?'active':''}" data-team-tab="hunt">
+        <span class="tab-icon">&#128273;</span>Hunt
+      </button>
+      <button class="app-tab ${teamTab==='clues'?'active':''}" data-team-tab="clues">
+        <span class="tab-icon">&#128194;${unviewed > 0 ? `<span class="tab-badge">${unviewed}</span>` : ''}</span>Your Clues
+      </button>
+    </div>
   `;
   bindGlobal();
-  document.getElementById('your-clues-btn').onclick = () => { stopScanner(); state.showHistory = true; state.notice=''; renderPlay(); };
+
+  document.querySelectorAll('[data-team-tab]').forEach(btn => {
+    btn.onclick = async () => {
+      stopScanner();
+      const target = btn.getAttribute('data-team-tab');
+      state.teamTab = target;
+      state.error = '';
+      if(target === 'clues'){
+        state.notice = '';
+        await markCluesViewed(team);
+        state.team = team;
+      }
+      renderPlay();
+    };
+  });
 
   const submitBtn = document.getElementById('submit-code');
   const scanBtn = document.getElementById('scan-btn');
@@ -748,7 +895,7 @@ async function renderPlay(){
       }
       if(team.found.includes(matched.id)){
         state.error = '';
-        state.notice = 'You already unlocked this one — check Your clues to view it.';
+        state.notice = 'You already unlocked this one — check Your Clues to view it.';
         state.pendingCodeValue = '';
         renderPlay();
         return;
@@ -762,7 +909,7 @@ async function renderPlay(){
       if(wasFirstFind && !team.startedAt) team.startedAt = Date.now();
       if(team.found.length >= clues.length) team.finishedAt = Date.now();
       try{
-        await saveTeam(team.slug, { name: team.name, password: team.password || '', found: team.found, history: team.history, startedAt: team.startedAt, finishedAt: team.finishedAt });
+        await saveTeam(team.slug, { name: team.name, password: team.password || '', found: team.found, history: team.history, startedAt: team.startedAt, finishedAt: team.finishedAt, viewedCount: team.viewedCount || 0 });
         state.team = team;
         state.error = '';
         state.pendingCodeValue = '';
@@ -785,15 +932,17 @@ async function renderPlay(){
 
 function viewAdminGate(){
   return `
-    <button class="back" data-nav="role">&larr; back</button>
-    <p class="eyebrow">Restricted</p>
-    <h1>Admin access</h1>
-    <p class="sub">Enter the event pin to manage clues and view team progress.</p>
-    <div class="folder">
-      <label>Pin</label>
-      <input type="password" id="pin-input" placeholder="Pin" autofocus>
-      ${state.error ? `<div class="error-msg">${state.error}</div>` : ''}
-      <button class="btn-primary" id="pin-submit">Unlock</button>
+    <div class="screen-fade">
+      <button class="back" data-nav="role">&larr; back</button>
+      <p class="eyebrow">Restricted</p>
+      <h1>Admin access</h1>
+      <p class="sub">Enter the event pin to manage clues and view team progress.</p>
+      <div class="folder">
+        <label>Pin</label>
+        <input type="password" id="pin-input" placeholder="Pin" autofocus>
+        ${state.error ? `<div class="error-msg">${state.error}</div>` : ''}
+        <button class="btn-primary" id="pin-submit">Unlock</button>
+      </div>
     </div>
   `;
 }
@@ -816,6 +965,7 @@ document.addEventListener('click', async (e) => {
 
 async function renderAdmin(){
   const app = document.getElementById('app');
+  document.body.classList.add('has-tabbar');
   const cfg = await getConfig();
   const teams = await getAllTeams();
 
@@ -897,24 +1047,26 @@ async function renderAdmin(){
   const titles = { leaderboard: 'Live leaderboard', teams: 'Teams and passwords', clues: 'Clues in order', settings: 'Event details' };
 
   app.innerHTML = `
-    <button class="back" data-nav="role">&larr; exit admin</button>
-    <p class="eyebrow">Admin</p>
-    <h1>Manage the hunt</h1>
-    <p class="sub">${titles[tab] || ''}</p>
+    <div class="screen-fade">
+      <button class="back" data-nav="role">&larr; exit admin</button>
+      <p class="eyebrow">Admin</p>
+      <h1>Manage the hunt</h1>
+      <p class="sub">${titles[tab] || ''}</p>
 
-    ${panes[tab] || ''}
+      ${panes[tab] || ''}
+    </div>
 
-    <div class="admin-tabbar">
-      <button class="admin-tab ${tab==='leaderboard'?'active':''}" data-admin-tab="leaderboard">
+    <div class="app-tabbar">
+      <button class="app-tab ${tab==='leaderboard'?'active':''}" data-admin-tab="leaderboard">
         <span class="tab-icon">&#9733;</span>Leaderboard
       </button>
-      <button class="admin-tab ${tab==='teams'?'active':''}" data-admin-tab="teams">
+      <button class="app-tab ${tab==='teams'?'active':''}" data-admin-tab="teams">
         <span class="tab-icon">&#128101;</span>Teams
       </button>
-      <button class="admin-tab ${tab==='clues'?'active':''}" data-admin-tab="clues">
+      <button class="app-tab ${tab==='clues'?'active':''}" data-admin-tab="clues">
         <span class="tab-icon">&#128273;</span>Clues
       </button>
-      <button class="admin-tab ${tab==='settings'?'active':''}" data-admin-tab="settings">
+      <button class="app-tab ${tab==='settings'?'active':''}" data-admin-tab="settings">
         <span class="tab-icon">&#9881;</span>Others
       </button>
     </div>
@@ -1141,7 +1293,8 @@ function bindAdminActions(cfg, teams){
           found: existing.found || [],
           history: existing.history || [],
           startedAt: existing.startedAt || null,
-          finishedAt: existing.finishedAt || null
+          finishedAt: existing.finishedAt || null,
+          viewedCount: existing.viewedCount || 0
         };
         writes.push(saveTeam(slug, data));
       });
@@ -1239,7 +1392,7 @@ function bindAdminActions(cfg, teams){
     document.getElementById('reset-confirm-yes').onclick = async () => {
       const allTeams = await getAllTeams();
       await Promise.all(allTeams.map(t => saveTeam(t.slug, {
-        name: t.name, password: t.password || '', found: [], history: [], startedAt: null, finishedAt: null
+        name: t.name, password: t.password || '', found: [], history: [], startedAt: null, finishedAt: null, viewedCount: 0
       })));
       document.getElementById('reset-confirm').style.display = 'none';
       document.getElementById('reset-msg').textContent = 'All team progress cleared. Teams and passwords were kept.';
@@ -1337,7 +1490,7 @@ function attachRowHandlers(row){
 function renderClueBody(clue){
   const photos = clue.photos || (clue.photo ? [clue.photo] : []);
   return `
-    ${clue.location ? `<span class="clue-location">Found at: ${escapeHtml(clue.location)}</span>` : ''}
+    ${clue.location ? `<span class="location-pill">&#128205; ${escapeHtml(clue.location)}</span>` : ''}
     ${photos.length ? `<div class="clue-photo-gallery">${photos.map(p => `<img class="clue-photo" src="${p}" alt="">`).join('')}</div>` : ''}
     <div>${escapeHtml(clue.text)}</div>
   `;
